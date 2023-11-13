@@ -74,11 +74,11 @@ let getWheatherData = function () {
 
 let drawChart = function (data) {
 
-    let { humidity, temperature, timestamps } = data;
+    let { humidity, temperature, timestamp } = data;
 
     humArr.push(Number(humidity));
     tempArr.push(Number(temperature));
-    upArr.push(Number(timestamps));
+    upArr.push(Number(timestamp));
     
     myChart.series[0].setData(humArr , true)
     myChart.series[1].setData(tempArr , true)
