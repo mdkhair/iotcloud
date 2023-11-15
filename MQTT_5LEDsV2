@@ -1,0 +1,98 @@
+#include <ESP8266WiFi.h>
+#include <PubSubClient.h>
+
+WiFiClient espClient;
+PubSubClient client(espClient);
+
+// Define LED pins
+const int led1Pin = D4;
+const int led2Pin = D5;
+const int led3Pin = D6;
+const int led4Pin = D7;
+const int led5Pin = D8;
+
+// Define LED topics
+const char* led1Topic = "led1";
+const char* led2Topic = "led2";
+const char* led3Topic = "led3";
+const char* led4Topic = "led4";
+const char* led5Topic = "led5";
+
+void reconnectmqttserver() {
+  while (!client.connected()) {
+    Serial.print("Attempting MQTT connection...");
+    String clientId = "ESP8266Client-";
+    clientId += String(random(0xffff), HEX);
+    if (client.connect(clientId.c_str())) {
+      Serial.println("connected");
+      client.subscribe(led1Topic);
+      client.subscribe(led2Topic);
+      client.subscribe(led3Topic);
+      client.subscribe(led4Topic);
+      client.subscribe(led5Topic);
+    } else {
+      Serial.print("failed, rc=");
+      Serial.print(client.state());
+      Serial.println(" try again in 5 seconds");
+      delay(5000);
+    }
+  }
+}
+
+void callback(char* topic, byte* payload, unsigned int length) {
+  String MQTT_DATA = "";
+  for (int i = 0; i < length; i++) {
+    MQTT_DATA += (char)payload[i];
+  }
+
+  if (String(topic) == led1Topic) {
+    controlLED(led1Pin, MQTT_DATA);
+  } else if (String(topic) == led2Topic) {
+    controlLED(led2Pin, MQTT_DATA);
+  } else if (String(topic) == led3Topic) {
+    controlLED(led3Pin, MQTT_DATA);
+  } else if (String(topic) == led4Topic) {
+    controlLED(led4Pin, MQTT_DATA);
+  } else if (String(topic) == led5Topic) {
+    controlLED(led5Pin, MQTT_DATA);
+  }
+}
+
+void controlLED(int pin, String payload) {
+  if (payload == "on") {
+    Serial.println("Turning ON " + String(pin));
+    digitalWrite(pin, HIGH);
+  } else if (payload == "off") {
+    Serial.println("Turning OFF " + String(pin));
+    digitalWrite(pin, LOW);
+  }
+}
+
+void setup() {
+  Serial.begin(9600);
+  WiFi.disconnect();
+  delay(1000);
+  Serial.println("START");
+  WiFi.begin("5G_CPE_UTM", "123456789");
+  while ((!(WiFi.status() == WL_CONNECTED))) {
+    delay(500);
+    Serial.print(".");
+  }
+  Serial.println("Connected to:");
+  Serial.println((WiFi.localIP().toString()));
+  client.setServer("broker.hivemq.com", 1883);
+  client.setCallback(callback);
+
+  pinMode(led1Pin, OUTPUT);
+  pinMode(led2Pin, OUTPUT);
+  pinMode(led3Pin, OUTPUT);
+  pinMode(led4Pin, OUTPUT);
+  pinMode(led5Pin, OUTPUT);
+}
+
+void loop() {
+  if (!client.connected()) {
+    reconnectmqttserver();
+  }
+  client.loop();
+}
