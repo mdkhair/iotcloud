@@ -1,75 +1,77 @@
 #include <ESP8266WiFi.h>
 #include <PubSubClient.h>
 
-// Replace these with your WiFi credentials and MQTT broker details
 const char* ssid = "your_SSID";
 const char* password = "your_PASSWORD";
-const char* mqtt_server = "your_MQTT_broker_IP";
-
-const char* topic = "ledControl";
-const int ledPin = D2; // Change this to the GPIO pin where your LED is connected
+const char* mqttBroker = "broker.hivemq.com"; // Replace with your MQTT broker IP or hostname
+const int mqttPort = 1883;
 
 WiFiClient espClient;
 PubSubClient client(espClient);
 
-void setup() {
-  pinMode(ledPin, OUTPUT);
+const int ledPin = D4; // Change this to the GPIO pin where your LED is connected
+const char* ledTopic = "ledControl"; // Change this to your desired topic
 
-  // Connect to Wi-Fi
-  WiFi.begin(ssid, password);
-  while (WiFi.status() != WL_CONNECTED) {
-    delay(1000);
-    Serial.println("Connecting to WiFi...");
-  }
-  Serial.println("Connected to WiFi");
-
-  // Connect to MQTT broker
-  client.setServer(mqtt_server, 1883);
-}
-
-void callback(char* topic, byte* payload, unsigned int length) {
-  // Convert the payload to a string
-  String message;
-  for (int i = 0; i < length; i++) {
-    message += (char)payload[i];
-  }
-
-  Serial.print("Received message on topic '");
-  Serial.print(topic);
-  Serial.print("': ");
-  Serial.println(message);
-
-  // Check if the message is "ON" or "OFF" and control the LED accordingly
-  if (message.equals("ON")) {
-    digitalWrite(ledPin, HIGH);
-  } else if (message.equals("OFF")) {
-    digitalWrite(ledPin, LOW);
-  }
-}
-
-void reconnect() {
-  // Loop until we're reconnected to the MQTT broker
+void reconnectMqttServer() {
   while (!client.connected()) {
-    Serial.println("Attempting MQTT connection...");
-    if (client.connect("ESP8266Client")) {
-      Serial.println("Connected to MQTT broker");
-      // Subscribe to the topic
-      client.subscribe(topic);
+    Serial.print("Attempting MQTT connection...");
+    String clientId = "ESP8266Client-";
+    clientId += String(random(0xffff), HEX);
+    if (client.connect(clientId.c_str())) {
+      Serial.println("connected");
+      client.subscribe(ledTopic);
     } else {
-      Serial.print("Failed, rc=");
+      Serial.print("failed, rc=");
       Serial.print(client.state());
-      Serial.println(" Retrying in 5 seconds...");
+      Serial.println(" try again in 5 seconds");
       delay(5000);
     }
   }
 }
 
-void loop() {
-  // Reconnect if necessary
-  if (!client.connected()) {
-    reconnect();
+void callback(char* topic, byte* payload, unsigned int length) {
+  String mqttData = "";
+  for (int i = 0; i < length; i++) {
+    mqttData += (char)payload[i];
   }
 
-  // Keep the MQTT connection alive
+  if (String(topic) == ledTopic) {
+    controlLED(mqttData);
+  }
+}
+
+void controlLED(String payload) {
+  if (payload == "on") {
+    Serial.println("Turning ON the LED");
+    digitalWrite(ledPin, HIGH);
+  } else if (payload == "off") {
+    Serial.println("Turning OFF the LED");
+    digitalWrite(ledPin, LOW);
+  }
+}
+
+void setup() {
+  Serial.begin(9600);
+  WiFi.disconnect();
+  delay(1000);
+  Serial.println("START");
+  WiFi.begin(ssid, password); // Connect to WiFi using global SSID and password
+  while (!(WiFi.status() == WL_CONNECTED)) {
+    delay(500);
+    Serial.print(".");
+  }
+  Serial.println("Connected to:");
+  Serial.println((WiFi.localIP().toString()));
+
+  client.setServer(mqttBroker, mqttPort); // Connect to MQTT broker using global broker details
+  client.setCallback(callback);
+
+  pinMode(ledPin, OUTPUT);
+}
+
+void loop() {
+  if (!client.connected()) {
+    reconnectMqttServer();
+  }
   client.loop();
 }
