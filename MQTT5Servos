@@ -78,19 +78,11 @@ void setup() {
   client.setServer("broker.hivemq.com", 1883);
   client.setCallback(callback);
 
-  servo1.attach(D2); // Attach servos to respective pins
-  servo2.attach(D3);
-  servo3.attach(D4);
-  servo4.attach(D5);
-  servo5.attach(D6);
-
-  // Additional setup for servo motors
-  servo1.write(90); // Set initial positions
-  servo2.write(90);
-  servo3.write(90);
-  servo4.write(90);
-  servo5.write(90);
-
+  servo1.attach(D2, 500, 2400); // Attach servos to respective pins
+  servo2.attach(D3, 500, 2400);
+  servo3.attach(D4, 500, 2400);
+  servo4.attach(D5, 500, 2400);
+  servo5.attach(D6, 500, 2400);
 }
 
 void loop() {
