@@ -18,6 +18,9 @@ const char* servo3Topic = "servo/3";
 const char* servo4Topic = "servo/4";
 const char* servo5Topic = "servo/5";
 
+#define SERVO_MIN_PULSE 1000 // Adjust this based on your servo's minimum pulse width (in microseconds)
+#define SERVO_MAX_PULSE 2000 // Adjust this based on your servo's maximum pulse width (in microseconds)
+
 void reconnectmqttserver() {
   while (!client.connected()) {
     Serial.print("Attempting MQTT connection...");
@@ -62,7 +65,7 @@ void callback(char* topic, byte* payload, unsigned int length) {
 
 void controlServo(uint8_t servoNum, int angle) {
   Serial.println("Setting Servo " + String(servoNum) + " Angle: " + String(angle));
-  uint16_t pulselen = map(angle, 0, 180, pwm.getServoMinimum(), pwm.getServoMaximum());
+  uint16_t pulselen = map(angle, 0, 180, SERVO_MIN_PULSE, SERVO_MAX_PULSE);
   pwm.setPWM(servoNum, 0, pulselen);
 }
 
