@@ -1,26 +1,26 @@
-#include <WiFi.h>
+#include <ESP8266WiFi.h>
 #include <PubSubClient.h>
-#include <ESP32Servo.h>
-#include <NewPing.h>
+#include <Servo.h>
+#include <NewPingESP8266.h>
 
-const char* ssid = "Wokwi-GUEST";
-const char* password = "";
+const char* ssid = "5G_CPE";
+const char* password = "123456789";
 const char* mqtt_server = "broker.hivemq.com";
 
 WiFiClient espClient;
 PubSubClient client(espClient);
 unsigned long lastMsg = 0;
-#define MSG_BUFFER_SIZE	(50)
+#define MSG_BUFFER_SIZE  (50)
 char msg[MSG_BUFFER_SIZE];
 int value = 0;
 bool statservo;
 bool statcar;
 Servo myservo;
 
-#define TRIGGER_PIN 22
-#define ECHO_PIN 23
+#define TRIGGER_PIN D6
+#define ECHO_PIN D5
 #define MAX_DISTANCE 300  // Maximum distance we want to measure (in centimeters)
-NewPing sonar(TRIGGER_PIN, ECHO_PIN, MAX_DISTANCE);
+NewPingESP8266 sonar(TRIGGER_PIN, ECHO_PIN, MAX_DISTANCE);
 
 void setup_wifi() {
 
@@ -56,17 +56,17 @@ void callback(String topic, byte* payload, unsigned int length) {
     fullpayload += (char)payload[i];
   }
   Serial.println();
-  if (topic == "servo1khair")
+  if (topic == "Zafri1ABC")
   {
-    if (fullpayload == "open" && statservo == false)
+    if (fullpayload == "masuk" && statservo == false)
     {
       myservo.write(0);
       statservo = true;
     }
   }
-  if (topic == "GatePark1")
+  if (topic == "GateZafriPark1")
   {
-    if (statcar == true && fullpayload == "open" && statservo == false)
+    if (statcar == true && fullpayload == "masuk" && statservo == false)
     {
       myservo.write(0);
       statservo = true;
@@ -86,8 +86,8 @@ void reconnect() {
       Serial.println("connected");
       // Once connected, publish an announcement...
       client.publish("outTopic", "hello world");
-      client.subscribe("servo1khair");
-      client.subscribe("GatePark1");
+      client.subscribe("Zafri1ABC");
+      client.subscribe("GateZafriPark1");
     } else {
       Serial.print("failed, rc=");
       Serial.print(client.state());
@@ -99,9 +99,8 @@ void reconnect() {
 }
 
 void setup() {
-  myservo.attach(19);
+  myservo.attach(D3, 500, 2400);
   myservo.write(90);
-  pinMode(18, INPUT_PULLUP);
   Serial.begin(115200);
   setup_wifi();
   client.setServer(mqtt_server, 1883);
@@ -114,16 +113,16 @@ void loop() {
   Serial.print("Distance: ");
   Serial.print(distance);
   Serial.println(" cm");
-
+  delay(200);
   // Check distance to control the servo and publish messages
-  if (statcar == false && statservo == true && distance < 50) {
+  if (statcar == false && statservo == true && distance < 6) {
     myservo.write(90); // Open the gate
     statservo = false;
-    client.publish("GateParking1", "open");
+    client.publish("GateZapPark1", "masuk");
     statcar = true;
   }
 
-  if (statcar == true && statservo == true && distance > 200)
+  if (statcar == true && statservo == true && distance > 15)
   {
     myservo.write(90);
     statservo = false;
