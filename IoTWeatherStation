@@ -1,0 +1,123 @@
+#include <WiFi.h>
+#include <PubSubClient.h>
+#include <Adafruit_Sensor.h>
+#include <DHT.h>
+#include <Adafruit_BMP085.h>
+#include <Wire.h>
+#include <Adafruit_GFX.h>
+#include <Adafruit_SH110X.h>
+
+// WiFi & MQTT Configuration
+const char* ssid = "YOUR_WIFI_SSID";
+const char* password = "YOUR_WIFI_PASSWORD";
+const char* mqtt_server = "broker.hivemq.com";
+
+WiFiClient espClient;
+PubSubClient client(espClient);
+
+// Sensor Configuration
+#define DHTPIN 4
+#define DHTTYPE DHT22
+DHT dht(DHTPIN, DHTTYPE);
+Adafruit_BMP085 bmp;
+
+// Rain Sensor Configuration (Digital Pin)
+#define RAIN_SENSOR_PIN 5   // Adjust pin number as needed
+
+// SH110X Display Configuration
+#define SCREEN_WIDTH 128
+#define SCREEN_HEIGHT 64
+// Create SH110X display object (reset pin set to -1 if not used)
+Adafruit_SH1106G display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, -1);
+
+void setup() {
+  Serial.begin(115200);
+
+  // Configure rain sensor pin as input
+  pinMode(RAIN_SENSOR_PIN, INPUT);
+
+  // WiFi Connection
+  WiFi.begin(ssid, password);
+  while (WiFi.status() != WL_CONNECTED) {
+    delay(500);
+    Serial.print(".");
+  }
+  Serial.println("\nWiFi connected");
+
+  // MQTT Connection
+  client.setServer(mqtt_server, 1883);
+  reconnect();
+
+  // Initialize Sensors
+  dht.begin();
+  if (!bmp.begin()) {
+    Serial.println("Could not find BMP180 sensor!");
+    while (1);
+  }
+
+  // Initialize SH110X Display at I2C address 0x3C (with internal charge pump enabled)
+  if (!display.begin(0x3C, true)) {
+    Serial.println("SH110X allocation failed!");
+    while (1);
+  }
+  display.clearDisplay();
+  display.setTextSize(1);
+  display.setTextColor(SH110X_WHITE);
+}
+
+void reconnect() {
+  while (!client.connected()) {
+    Serial.print("Connecting to MQTT...");
+    if (client.connect("ESP32_Weather")) {
+      Serial.println(" connected");
+    } else {
+      Serial.print(" failed, rc=");
+      Serial.print(client.state());
+      Serial.println(" retrying...");
+      delay(2000);
+    }
+  }
+}
+
+void loop() {
+  if (!client.connected()) reconnect();
+  client.loop();
+
+  // Read DHT22 temperature and humidity
+  float temperature = dht.readTemperature();
+  float humidity = dht.readHumidity();
+  // Read BMP180 pressure (convert to hPa)
+  float pressure = bmp.readPressure() / 100.0;
+
+  // Read Rain Sensor (digital)
+  int rainSensorValue = digitalRead(RAIN_SENSOR_PIN);
+  // Assume: LOW means rain, HIGH means dry
+  const char* rainStatus = (rainSensorValue == LOW) ? "Rain" : "Dry";
+
+  if (!isnan(temperature) && !isnan(humidity) && !isnan(pressure)) {
+    Serial.printf("Temp: %.2f°C, Hum: %.2f%%, Pressure: %.2f hPa, Rain: %s\n", 
+                  temperature, humidity, pressure, rainStatus);
+
+    // Convert sensor values to strings for MQTT
+    char tempStr[10], humStr[10], presStr[10];
+    dtostrf(temperature, 6, 2, tempStr);
+    dtostrf(humidity, 6, 2, humStr);
+    dtostrf(pressure, 6, 2, presStr);
+
+    client.publish("/weather/temperature", tempStr);
+    client.publish("/weather/humidity", humStr);
+    client.publish("/weather/pressure", presStr);
+    client.publish("/weather/rain", rainStatus);
+
+    // Display sensor data on SH110X OLED
+    display.clearDisplay();
+    display.setCursor(0, 0);
+    display.printf("Temp: %.2f C\n", temperature);
+    display.printf("Hum: %.2f %%\n", humidity);
+    display.printf("Pres: %.2f hPa\n", pressure);
+    display.printf("Rain: %s\n", rainStatus);
+    display.display();
+  }
+
+  delay(5000);  // Update every 5 seconds
+}
